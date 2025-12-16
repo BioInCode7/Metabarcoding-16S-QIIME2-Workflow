@@ -570,3 +570,57 @@ qiime phylogeny align-to-tree-mafft-fasttree \
 #
 # Beta d
 
+
+###############################################################################
+# STEP W — Taxonomic filtering of non-bacterial sequences
+###############################################################################
+#
+# 16S rRNA primers frequently amplify:
+#   - Mitochondrial sequences
+#   - Chloroplast sequences
+#   - Occasionally eukaryotic contaminants
+#
+# These sequences:
+#   - Are biologically real
+#   - BUT are not informative for bacterial community analyses
+#
+# Therefore, they must be removed BEFORE diversity analyses.
+#
+###############################################################################
+#
+# IMPORTANT:
+# Taxonomic filtering affects:
+#   - Feature table
+#   - Downstream diversity metrics
+#
+# It does NOT affect:
+#   - Raw ASV inference
+#   - Reproducibility of the denoising step
+#
+###############################################################################
+
+qiime taxa filter-table \
+  --i-table "${QIIME2_OUTPUT_DIR}/table-dada2.qza" \
+  --i-taxonomy "${QIIME2_OUTPUT_DIR}/taxonomy.qza" \
+  --p-exclude mitochondria,chloroplast,eukaryota \
+  --o-filtered-table "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza"
+
+###############################################################################
+# STEP W2 — Summary after taxonomic filtering
+###############################################################################
+#
+# This summary allows inspection of:
+#   - Retained sequencing depth
+#   - Potential sample loss
+#
+###############################################################################
+
+qiime feature-table summarize \
+  --i-table "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/table-taxa-filtered-summary.qzv" \
+  --m-sample-metadata-file "${SAMPLE_METADATA_FILE}"
+
+###############################################################################
+# END OF TAXONOMIC FILTERING
+###############################################################################
+
