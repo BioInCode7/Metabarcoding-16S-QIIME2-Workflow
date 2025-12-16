@@ -193,3 +193,77 @@ mkdir -p "${EXPORT_DIR}"
 # END OF CONFIGURATION BLOCK
 ###############################################################################
 
+
+###############################################################################
+# STEP 1 — Import raw sequencing data into QIIME2
+###############################################################################
+#
+# Raw FASTQ files are imported using a manifest file.
+# This step does NOT modify the data; it only makes them readable by QIIME2.
+#
+# It is critical that:
+# - Phred encoding is correct
+# - Paired-end reads are correctly labeled
+#
+###############################################################################
+
+qiime tools import \
+  --type 'SampleData[PairedEndSequencesWithQuality]' \
+  --input-path "${MANIFEST_FILE}" \
+  --output-path "${QIIME2_OUTPUT_DIR}/demux-paired-end.qza" \
+  --input-format PairedEndFastqManifestPhred33V2
+
+###############################################################################
+# STEP 2 — Visualize sequencing quality
+###############################################################################
+#
+# This visualization is ESSENTIAL.
+# All downstream parameter choices (truncation, trimming) depend on it.
+#
+###############################################################################
+
+qiime demux summarize \
+  --i-data "${QIIME2_OUTPUT_DIR}/demux-paired-end.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/demux-summary.qzv"
+
+###############################################################################
+# STEP 3 — Primer trimming with cutadapt
+###############################################################################
+#
+# Even if primers were removed by the sequencing provider,
+# trimming them again ensures:
+# - Exact removal
+# - Consistent read starts
+# - Improved denoising performance
+#
+# IMPORTANT:
+# Replace primer sequences with those used in your experiment.
+#
+###############################################################################
+
+FORWARD_PRIMER="CCTACGGGNGGCWGCAG"
+REVERSE_PRIMER="GACTACHVGGGTATCTAATCC"
+
+qiime cutadapt trim-paired \
+  --i-demultiplexed-sequences "${QIIME2_OUTPUT_DIR}/demux-paired-end.qza" \
+  --p-front-f "${FORWARD_PRIMER}" \
+  --p-front-r "${REVERSE_PRIMER}" \
+  --p-discard-untrimmed \
+  --p-cores "${N_THREADS}" \
+  --o-trimmed-sequences "${QIIME2_OUTPUT_DIR}/demux-trimmed.qza"
+
+###############################################################################
+# STEP 4 — Quality check after primer trimming
+###############################################################################
+#
+# This step confirms that trimming behaved as expected.
+#
+###############################################################################
+
+qiime demux summarize \
+  --i-data "${QIIME2_OUTPUT_DIR}/demux-trimmed.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/demux-trimmed-summary.qzv"
+
+###############################################################################
+# END OF STEP 1
+###############################################################################
