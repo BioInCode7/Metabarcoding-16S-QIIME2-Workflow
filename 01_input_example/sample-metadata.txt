@@ -1,0 +1,14 @@
+sample-id	host	treatment	diet	probiotic_type	replicate	group
+#q2:types	categorical	categorical	categorical	categorical	numeric	categorical
+X-1-16S-N2468	Gm mellonella	inoculado	100% LLDPE	probiotico_5	1	Gm_In_LLDPE_Bsu
+X-2-16S-N2476	Gm mellonella	inoculado	100% LLDPE	probiotico_5	2	Gm_In_LLDPE_Bsu
+W-1-16S-N2467	Gm mellonella	inoculado	100% LLDPE	probiotico_6	1	Gm_In_LLDPE_Rml
+X-3-16S-N2484	Gm mellonella	inoculado	100% LLDPE	probiotico_5	3	Gm_In_LLDPE_Bsu
+W-2-16S-N2475	Gm mellonella	inoculado	100% LLDPE	probiotico_6	2	Gm_In_LLDPE_Rml
+S-2-16S-N2471	Gm mellonella	no_inoculado	100% LLDPE	no_probiotico	2	Gm_NIn_LLDPE
+S-1-16S-N2463	Gm mellonella	no_inoculado	100% LLDPE	no_probiotico	1	Gm_NIn_LLDPE
+W-3-16S-N2483	Gm mellonella	inoculado	100% LLDPE	probiotico_6	3	Gm_In_LLDPE_Rml
+S-3-16S-N2479	Gm mellonella	no_inoculado	100% LLDPE	no_probiotico	3	Gm_NIn_LLDPE
+U-3-16S-N2481	Gm mellonella	no_inoculado	dieta_estandar	no_probiotico	3	Gm_NIn_control
+U-2-16S-N2473	Gm mellonella	no_inoculado	dieta_estandar	no_probiotico	2	Gm_NIn_control
+U-1-16S-N2465	Gm mellonella	no_inoculado	dieta_estandar	no_probiotico	1	Gm_NIn_control

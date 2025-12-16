@@ -7,12 +7,31 @@
 *.bak
 
 # ===============================
-# RAW DATA (NEVER COMMIT)
+# RAW DATA (full datasets only)
 # ===============================
-*.fastq
-*.fastq.gz
-*.fq
-*.fq.gz
+raw_fastq/
+full_fastq/
+data/raw/
+
+# ===============================
+# Allow subsampled example data
+# ===============================
+!01_input_example/fastq_subsampled/*.fastq.gz
+
+# ===============================
+# QIIME2 artifacts
+# ===============================
+qiime2_outputs/
+exported_data/
+*.qza.cache
+
+# ===============================
+# QC raw outputs
+# ===============================
+qc_fastqc/
+qc_multiqc/multiqc_data*
+*.zip
+
 
 # ===============================
 # QIIME2 ARTIFACTS (OPTIONAL)
@@ -55,3 +74,32 @@ Thumbs.db
 *.fastq
 *.fastq.gz
 raw_fastq/
+
+# ===============================
+# QIIME2 artifacts (regenerable)
+# ===============================
+qiime2_outputs/
+exported_data/
+*.qza.cache
+
+# ===============================
+# QC raw outputs
+# ===============================
+qc_fastqc/
+qc_multiqc/multiqc_data*
+*.zip
+
+# ===============================
+# Temporary / logs
+# ===============================
+*.log
+*.tmp
+*.swp
+
+# ===============================
+# OS / editor
+# ===============================
+.DS_Store
+.idea/
+.vscode/
+
