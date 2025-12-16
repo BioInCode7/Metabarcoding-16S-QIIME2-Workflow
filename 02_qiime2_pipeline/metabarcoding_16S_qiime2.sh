@@ -624,3 +624,120 @@ qiime feature-table summarize \
 # END OF TAXONOMIC FILTERING
 ###############################################################################
 
+
+###############################################################################
+# STEP V — Beta diversity statistical testing (PERMANOVA)
+###############################################################################
+#
+# PERMANOVA (Permutational Multivariate Analysis of Variance) is used to test
+# whether the centroids of predefined groups differ in multivariate space.
+#
+# It operates on distance matrices derived from beta diversity metrics.
+#
+###############################################################################
+#
+# WHAT PERMANOVA TESTS
+#
+# - Null hypothesis:
+#     The centroids of the groups are identical in multivariate space.
+#
+# - Alternative hypothesis:
+#     At least one group centroid differs.
+#
+###############################################################################
+#
+# WHAT PERMANOVA DOES NOT TEST
+#
+# - It does NOT identify which taxa drive differences
+# - It does NOT measure within-group dispersion
+# - It does NOT imply causality
+#
+# A significant PERMANOVA result indicates group separation,
+# NOT mechanistic explanation.
+#
+###############################################################################
+#
+# IMPORTANT ASSUMPTION
+#
+# PERMANOVA assumes homogeneity of multivariate dispersion.
+#
+# Therefore:
+# - Significant results SHOULD be accompanied by a dispersion test
+# - Differences in dispersion can inflate false positives
+#
+###############################################################################
+#
+# CHOICE OF METADATA VARIABLE
+#
+# The grouping variable must:
+#   - Reflect the experimental design
+#   - Be defined a priori
+#   - Avoid circular definitions
+#
+###############################################################################
+
+###############################################################################
+# PERMANOVA ON BRAY–CURTIS DISTANCE
+###############################################################################
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix "${QIIME2_OUTPUT_DIR}/core-metrics/bray_curtis_distance_matrix.qza" \
+  --m-metadata-file "${SAMPLE_METADATA_FILE}" \
+  --m-metadata-column group \
+  --p-method permanova \
+  --p-permutations 999 \
+  --o-visualization "${VISUALIZATION_DIR}/permanova-bray-curtis-group.qzv"
+
+###############################################################################
+# PERMANOVA ON WEIGHTED UNIFRAC DISTANCE
+###############################################################################
+#
+# Weighted UniFrac incorporates both:
+#   - Relative abundance
+#   - Phylogenetic relationships
+#
+###############################################################################
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix "${QIIME2_OUTPUT_DIR}/core-metrics/weighted_unifrac_distance_matrix.qza" \
+  --m-metadata-file "${SAMPLE_METADATA_FILE}" \
+  --m-metadata-column group \
+  --p-method permanova \
+  --p-permutations 999 \
+  --o-visualization "${VISUALIZATION_DIR}/permanova-weighted-unifrac-group.qzv"
+
+###############################################################################
+# DISPERSION TEST (BETADISPER)
+###############################################################################
+#
+# This test evaluates whether group dispersions differ.
+# A significant dispersion test requires cautious interpretation
+# of PERMANOVA results.
+#
+###############################################################################
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix "${QIIME2_OUTPUT_DIR}/core-metrics/bray_curtis_distance_matrix.qza" \
+  --m-metadata-file "${SAMPLE_METADATA_FILE}" \
+  --m-metadata-column group \
+  --p-method permdisp \
+  --p-permutations 999 \
+  --o-visualization "${VISUALIZATION_DIR}/permdisp-bray-curtis-group.qzv"
+
+###############################################################################
+# END OF PERMANOVA ANALYSES
+###############################################################################
+
+###############################################################################
+# NOTE ON REPORTING RESULTS (PAPER-READY)
+###############################################################################
+#
+# Example phrasing:
+#
+# "Community composition differed between groups based on Bray–Curtis
+# dissimilarities (PERMANOVA, 999 permutations, p < 0.05). However, dispersion
+# tests indicated [no / significant] differences in within-group variability,
+# and results were interpreted accordingly."
+#
+###############################################################################
+
