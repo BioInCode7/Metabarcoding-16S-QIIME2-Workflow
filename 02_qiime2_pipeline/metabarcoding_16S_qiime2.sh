@@ -112,6 +112,14 @@
 
 set -euo pipefail
 
+# ===============================
+# PIPELINE CONTROL FLAGS
+# ===============================
+# Set these to 1 to stop the pipeline at a given step
+
+STOP_AFTER_MULTIQC=0
+STOP_AFTER_DADA2=0
+
 ###############################################################################
 # START OF PIPELINE
 ###############################################################################
@@ -134,21 +142,50 @@ set -euo pipefail
 # ===============================
 # This is the base directory where all inputs and outputs will be stored.
 # Change this path to your own project location.
-
-PROJECT_BASE_DIR="${PROJECT_BASE_DIR:-$(pwd)}"
+# Resolve repository root directory (script lives in 02_qiime2_pipeline/)
+PROJECT_BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ===============================
 # INPUT DATA
 # ===============================
 
 # Directory containing paired-end FASTQ files (Phred33)
-INPUT_FASTQ_DIR="${PROJECT_BASE_DIR}/raw_fastq"
+INPUT_FASTQ_DIR="${PROJECT_BASE_DIR}/01_input_example/fastq_subsampled"
 
 # Sample metadata file (QIIME2-compatible TSV)
-SAMPLE_METADATA_FILE="${PROJECT_BASE_DIR}/sample-metadata.tsv"
+SAMPLE_METADATA_FILE="${PROJECT_BASE_DIR}/01_input_example/sample-metadata.txt"
 
 # Manifest file for importing FASTQ files into QIIME2
-MANIFEST_FILE="${PROJECT_BASE_DIR}/manifest.tsv"
+MANIFEST_FILE="${PROJECT_BASE_DIR}/01_input_example/manifest_v2.tsv"
+
+# DEBUG (ahora sí)
+echo "DEBUG: PROJECT_BASE_DIR = ${PROJECT_BASE_DIR}"
+echo "DEBUG: INPUT_FASTQ_DIR = ${INPUT_FASTQ_DIR}"
+ls -lh "${INPUT_FASTQ_DIR}"
+
+
+###############################################################################
+# INPUT VALIDATION
+###############################################################################
+
+echo "🔍 Validating input files..."
+
+[[ -d "$INPUT_FASTQ_DIR" ]] || {
+  echo "ERROR: FASTQ directory not found: $INPUT_FASTQ_DIR"
+  exit 1
+}
+
+[[ -f "$MANIFEST_FILE" ]] || {
+  echo "ERROR: Manifest file not found: $MANIFEST_FILE"
+  exit 1
+}
+
+[[ -f "$SAMPLE_METADATA_FILE" ]] || {
+  echo "ERROR: Sample metadata file not found: $SAMPLE_METADATA_FILE"
+  exit 1
+}
+
+echo "✅ Input validation passed"
 
 # ===============================
 # TAXONOMIC CLASSIFIER
@@ -161,7 +198,7 @@ MANIFEST_FILE="${PROJECT_BASE_DIR}/manifest.tsv"
 #
 # Using a generic classifier is a common source of poor taxonomic resolution.
 
-SILVA_CLASSIFIER_QZA="/path/to/silva-V3V4-custom-classifier.qza"
+SILVA_CLASSIFIER_QZA="${PROJECT_BASE_DIR}/02_qiime2_pipeline/classifiers/silva-138-v3v4-420bp/silva-138-V3V4-420-classifier.qza"
 
 # ===============================
 # COMPUTATIONAL RESOURCES
@@ -194,42 +231,63 @@ mkdir -p "${EXPORT_DIR}"
 ###############################################################################
 
 ###############################################################################
-# STEP 0 — Auto-generate paired-end FASTQ manifest (example data)
+# STEP 0A — Quality control of raw FASTQ files (FastQC)
 ###############################################################################
 #
-# This pipeline automatically generates a QIIME2-compatible manifest file
-# from the subsampled FASTQ files included in the repository.
+# FastQC provides per-base quality scores, GC content, adapter contamination,
+# and overrepresented sequence diagnostics.
 #
-# Expected filename pattern:
-#   <sample-id>_R1_*.fastq.gz
-#   <sample-id>_R2_*.fastq.gz
+# This step is CRITICAL for:
+#   - Deciding trimming and truncation parameters
+#   - Assessing sequencing quality BEFORE any processing
+#
+# FastQC is run on the raw (subsampled) FASTQ files included in the repository.
 #
 ###############################################################################
 
-INPUT_FASTQ_DIR="${PROJECT_BASE_DIR}/raw_fastq"
-MANIFEST_FILE="${PROJECT_BASE_DIR}/manifest.tsv"
+FASTQC_DIR="${PROJECT_BASE_DIR}/qc_fastqc"
+MULTIQC_DIR="${PROJECT_BASE_DIR}/qc_multiqc"
 
-mkdir -p "$(dirname "$MANIFEST_FILE")"
+mkdir -p "${FASTQC_DIR}"
+mkdir -p "${MULTIQC_DIR}"
 
-echo -e "sample-id\tforward-absolute-filepath\treverse-absolute-filepath" \
-  > "$MANIFEST_FILE"
+echo "▶ Running FastQC on raw FASTQ files..."
 
-for R1 in "${INPUT_FASTQ_DIR}"/*_R1_*.fastq.gz; do
-  SAMPLE_ID=$(basename "$R1" | sed 's/_R1_.*\.fastq\.gz//')
+fastqc \
+  --threads "${N_THREADS}" \
+  --outdir "${FASTQC_DIR}" \
+  "${INPUT_FASTQ_DIR}"/*.fastq.gz
 
-  R2="${INPUT_FASTQ_DIR}/${SAMPLE_ID}_R2_subsampled.fastq.gz"
+echo "✅ FastQC completed"
 
-  if [[ ! -f "$R2" ]]; then
-    echo "ERROR: Missing R2 file for sample ${SAMPLE_ID}"
-    exit 1
-  fi
+###############################################################################
+# STEP 0B — Aggregate QC reports with MultiQC
+###############################################################################
+#
+# MultiQC aggregates all FastQC reports into a single interactive HTML file.
+#
+# This report is the PRIMARY document used to:
+#   - Decide truncation lengths for DADA2
+#   - Evaluate overall sequencing quality
+#
+# This file should be archived and cited in reports if relevant.
+#
+###############################################################################
 
-  echo -e "${SAMPLE_ID}\t${R1}\t${R2}" \
-    >> "$MANIFEST_FILE"
-done
+echo "▶ Running MultiQC..."
 
-echo "--- Paired-end FASTQ manifest generated ---"
-echo "    $MANIFEST_FILE"
+multiqc \
+  "${FASTQC_DIR}" \
+  --outdir "${MULTIQC_DIR}"
+
+echo "✅ MultiQC report generated:"
+echo "   ${MULTIQC_DIR}/multiqc_report.html"
+
+if [[ "${STOP_AFTER_MULTIQC}" -eq 1 ]]; then
+  echo "🛑 Pipeline stopped after MultiQC as requested."
+  exit 0
+fi
+
 
 ###############################################################################
 # STEP 1 — Import raw sequencing data into QIIME2
@@ -335,8 +393,15 @@ qiime demux summarize \
 ###############################################################################
 
 # Example truncation values (to be adjusted by the user)
-TRUNC_LEN_F=240
-TRUNC_LEN_R=200
+TRUNC_LEN_F=280
+TRUNC_LEN_R=260
+
+# NOTE:
+# Conservative truncation values were initially tested (270/240),
+# but inspection of demux summary plots showed consistently high
+# quality scores beyond these positions. Therefore, truncation
+# lengths were extended to retain additional high-quality bases
+# and maximize taxonomic resolution.
 
 qiime dada2 denoise-paired \
   --i-demultiplexed-seqs "${QIIME2_OUTPUT_DIR}/demux-trimmed.qza" \
@@ -345,12 +410,75 @@ qiime dada2 denoise-paired \
   --p-n-threads "${N_THREADS}" \
   --o-table "${QIIME2_OUTPUT_DIR}/table-dada2.qza" \
   --o-representative-sequences "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
-  --o-denoising-stats "${QIIME2_OUTPUT_DIR}/denoising-stats.qza"
+  --o-denoising-stats "${QIIME2_OUTPUT_DIR}/denoising-stats.qza" \
+  --o-base-transition-stats "${QIIME2_OUTPUT_DIR}/base-transition-stats.qza"
+
+
+  if [[ "${STOP_AFTER_DADA2}" -eq 1 ]]; then
+  echo "🛑 Pipeline stopped after DADA2 as requested."
+  exit 0
+fi
 
 ###############################################################################
 # STEP 6 — DADA2 summary statistics
 ###############################################################################
 
+
+# This step generates human-readable summaries of the DADA2 outputs.
+# These visualizations are ESSENTIAL to:
+#   - Evaluate read retention
+#   - Detect problematic samples
+#   - Justify denoising parameters
+#
+###############################################################################
+
+# --------------------------------
+# 6.1 Feature table summary
+# --------------------------------
+#
+# Shows:
+# - Number of features (ASVs) per sample
+# - Total frequency per sample
+#
+# Used to:
+# - Detect low-depth samples
+# - Inform rarefaction depth choice
+#
+
+qiime feature-table summarize \
+  --i-table "${QIIME2_OUTPUT_DIR}/table-dada2.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/table-dada2-summary.qzv" \
+  --m-sample-metadata-file "${SAMPLE_METADATA_FILE}"
+
+# --------------------------------
+# 6.2 ASV sequence length distribution
+# --------------------------------
+#
+# Confirms:
+# - Consistency of ASV lengths
+# - Absence of truncated or anomalous sequences
+#
+
+qiime feature-table tabulate-seqs \
+  --i-data "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/rep-seqs-dada2.qzv"
+
+# --------------------------------
+# 6.3 DADA2 denoising statistics
+# --------------------------------
+#
+# Reports:
+# - Reads input
+# - Reads filtered
+# - Reads merged
+# - Non-chimeric reads
+#
+# This is the PRIMARY diagnostic for DADA2 performance.
+#
+
+qiime metadata tabulate \
+  --m-input-file "${QIIME2_OUTPUT_DIR}/denoising-stats.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/denoising-stats.qzv"
 
 ###############################################################################
 # STEP 7 — Taxonomic classification of ASVs
@@ -407,6 +535,54 @@ qiime metadata tabulate \
   --m-input-file "${QIIME2_OUTPUT_DIR}/taxonomy.qza" \
   --o-visualization "${VISUALIZATION_DIR}/taxonomy.qzv"
 
+  ###############################################################################
+# STEP 9 — Taxonomic filtering of non-bacterial sequences
+###############################################################################
+
+qiime taxa filter-table \
+  --i-table "${QIIME2_OUTPUT_DIR}/table-dada2.qza" \
+  --i-taxonomy "${QIIME2_OUTPUT_DIR}/taxonomy.qza" \
+  --p-exclude mitochondria,chloroplast,eukaryota \
+  --o-filtered-table "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza"
+
+qiime feature-table summarize \
+  --i-table "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/table-taxa-filtered-summary.qzv" \
+  --m-sample-metadata-file "${SAMPLE_METADATA_FILE}"
+
+  ###############################################################################
+# STEP 10 — Rarefaction
+###############################################################################
+
+SAMPLING_DEPTH=10000
+
+qiime feature-table rarefy \
+  --i-table "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza" \
+  --p-sampling-depth "${SAMPLING_DEPTH}" \
+  --o-rarefied-table "${QIIME2_OUTPUT_DIR}/table-rarefied.qza"
+
+  ###############################################################################
+# STEP 11 — Phylogenetic tree construction
+###############################################################################
+
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
+  --o-alignment "${QIIME2_OUTPUT_DIR}/aligned-rep-seqs.qza" \
+  --o-masked-alignment "${QIIME2_OUTPUT_DIR}/masked-aligned-rep-seqs.qza" \
+  --o-tree "${QIIME2_OUTPUT_DIR}/unrooted-tree.qza" \
+  --o-rooted-tree "${QIIME2_OUTPUT_DIR}/rooted-tree.qza"
+
+  ###############################################################################
+# STEP 12 — Core diversity metrics
+###############################################################################
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny "${QIIME2_OUTPUT_DIR}/rooted-tree.qza" \
+  --i-table "${QIIME2_OUTPUT_DIR}/table-rarefied.qza" \
+  --p-sampling-depth "${SAMPLING_DEPTH}" \
+  --m-metadata-file "${SAMPLE_METADATA_FILE}" \
+  --output-dir "${QIIME2_OUTPUT_DIR}/core-metrics"
+
 ###############################################################################
 # END OF TAXONOMIC CLASSIFICATION
 ###############################################################################
@@ -440,228 +616,6 @@ qiime metadata tabulate \
 #   - Not by aggressive database pruning
 #
 ###############################################################################
-
-###############################################################################
-# STEP X — Rarefaction and Sampling Depth Selection
-###############################################################################
-#
-# Rarefaction is applied exclusively for diversity analyses (alpha and beta).
-# It is NOT used for:
-#   - Taxonomic composition
-#   - Differential abundance analysis
-#   - Functional inference (PICRUSt2)
-#
-# Rarefaction enforces an equal sequencing depth across samples to allow
-# meaningful diversity comparisons.
-#
-# ⚠️ IMPORTANT:
-# Rarefaction ALWAYS discards data.
-# The goal is NOT to avoid data loss, but to make it explicit and justified.
-#
-###############################################################################
-#
-# CONCEPTUAL FRAMEWORK
-#
-# Sampling depth is the number of sequences per sample retained after
-# subsampling. It represents a trade-off between:
-#
-#   - Retaining all biological replicates
-#   - Preserving as much within-sample diversity as possible
-#
-# There is no universally "correct" sampling depth.
-# The chosen value must be justified based on the dataset.
-#
-###############################################################################
-#
-# HOW TO SELECT SAMPLING DEPTH (REQUIRED PROCEDURE)
-#
-# 1. Inspect the feature table AFTER:
-#    - DADA2 denoising
-#    - Taxonomic filtering (mitochondria, chloroplasts, eukaryotes removed)
-#
-#    Command:
-#
-#    qiime feature-table summarize \
-#      --i-table table-taxa-filtered.qza \
-#      --o-visualization table-summary-taxa-filtered.qzv \
-#      --m-sample-metadata-file sample-metadata.tsv
-#
-# 2. Open the visualization:
-#      qiime view table-summary-taxa-filtered.qzv
-#
-# 3. Identify:
-#    - The minimum sequencing depth
-#    - Samples or groups with systematically lower depth
-#
-###############################################################################
-#
-# RAREFACTION CURVES AS DECISION SUPPORT
-#
-# Rarefaction curves MUST be interpreted metric by metric:
-#
-#   - Shannon diversity:
-#       * Typically reaches saturation at relatively low depths
-#       * Robust to subsampling
-#       * Recommended for interpretation when sequencing depth is limited
-#
-#   - Observed Features:
-#       * Sensitive to sequencing depth
-#       * May or may not reach saturation
-#
-#   - Chao1:
-#       * Estimates unseen richness
-#       * Often does NOT plateau
-#       * Lack of saturation does NOT invalidate the analysis
-#
-# Failure of Chao1 to plateau indicates incomplete richness capture,
-# NOT methodological error.
-#
-###############################################################################
-#
-# FINAL DECISION CRITERIA
-#
-# The selected sampling depth should:
-#   - Retain all biological replicates whenever possible
-#   - Fall below the minimum sample depth
-#   - Be supported by Shannon rarefaction curves approaching saturation
-#
-# Richness-based metrics should be interpreted conservatively when curves
-# do not plateau.
-#
-###############################################################################
-#
-# EXAMPLE STATEMENT (PAPER-READY)
-#
-# "The sampling depth was selected as a compromise between retaining all samples
-# and preserving sequencing depth. Rarefaction curves indicated that Shannon
-# diversity approached saturation at this depth, while richness estimators did
-# not fully plateau, suggesting underestimation of absolute richness but
-# allowing robust comparative diversity analyses."
-#
-###############################################################################
-#
-# RAREFY FEATURE TABLE
-#
-###############################################################################
-
-qiime feature-table rarefy \
-  --i-table table-taxa-filtered.qza \
-  --p-sampling-depth 3000 \
-  --o-rarefied-table table-rarefied.qza
-
-###############################################################################
-# END OF RAREFACTION STEP
-###############################################################################
-
-
-###############################################################################
-# STEP Y — Phylogenetic tree construction
-###############################################################################
-#
-# A phylogenetic tree is required for phylogeny-based diversity metrics
-# such as Faith's PD and UniFrac distances.
-#
-# IMPORTANT:
-# The tree is built from representative ASV sequences inferred by DADA2.
-#
-# This tree:
-#   - Represents relationships between ASVs
-#   - Does NOT represent an organismal phylogeny
-#
-###############################################################################
-#
-# TREE CONSTRUCTION PIPELINE
-#
-# 1. Multiple sequence alignment (MAFFT)
-# 2. Masking of hypervariable positions
-# 3. Tree inference (FastTree)
-# 4. Rooting
-#
-###############################################################################
-
-qiime phylogeny align-to-tree-mafft-fasttree \
-  --i-sequences "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
-  --o-alignment "${QIIME2_OUTPUT_DIR}/aligned-rep-seqs.qza" \
-  --o-masked-alignment "${QIIME2_OUTPUT_DIR}/masked-aligned-rep-seqs.qza" \
-  --o-tree "${QIIME2_OUTPUT_DIR}/unrooted-tree.qza" \
-  --o-rooted-tree "${QIIME2_OUTPUT_DIR}/rooted-tree.qza"
-
-###############################################################################
-# STEP Z — Alpha and Beta diversity analyses
-###############################################################################
-#
-# Diversity analyses are performed on the rarefied feature table ONLY.
-#
-# This ensures:
-#   - Equal sampling depth across samples
-#   - Comparable diversity estimates
-#
-###############################################################################
-#
-# DIVERSITY METRICS USED
-#
-# Alpha diversity:
-#   - Shannon: accounts for richness and evenness
-#   - Observed Features: raw ASV richness
-#   - Faith's PD: phylogenetic diversity
-#
-# Beta d
-
-
-###############################################################################
-# STEP W — Taxonomic filtering of non-bacterial sequences
-###############################################################################
-#
-# 16S rRNA primers frequently amplify:
-#   - Mitochondrial sequences
-#   - Chloroplast sequences
-#   - Occasionally eukaryotic contaminants
-#
-# These sequences:
-#   - Are biologically real
-#   - BUT are not informative for bacterial community analyses
-#
-# Therefore, they must be removed BEFORE diversity analyses.
-#
-###############################################################################
-#
-# IMPORTANT:
-# Taxonomic filtering affects:
-#   - Feature table
-#   - Downstream diversity metrics
-#
-# It does NOT affect:
-#   - Raw ASV inference
-#   - Reproducibility of the denoising step
-#
-###############################################################################
-
-qiime taxa filter-table \
-  --i-table "${QIIME2_OUTPUT_DIR}/table-dada2.qza" \
-  --i-taxonomy "${QIIME2_OUTPUT_DIR}/taxonomy.qza" \
-  --p-exclude mitochondria,chloroplast,eukaryota \
-  --o-filtered-table "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza"
-
-###############################################################################
-# STEP W2 — Summary after taxonomic filtering
-###############################################################################
-#
-# This summary allows inspection of:
-#   - Retained sequencing depth
-#   - Potential sample loss
-#
-###############################################################################
-
-qiime feature-table summarize \
-  --i-table "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza" \
-  --o-visualization "${VISUALIZATION_DIR}/table-taxa-filtered-summary.qzv" \
-  --m-sample-metadata-file "${SAMPLE_METADATA_FILE}"
-
-###############################################################################
-# END OF TAXONOMIC FILTERING
-###############################################################################
-
-
 ###############################################################################
 # STEP V — Beta diversity statistical testing (PERMANOVA)
 ###############################################################################

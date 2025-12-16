@@ -48,6 +48,11 @@ Users are expected to:
 - Supply their own FASTQ files
 - Adapt metadata and experimental design to their system
 
+For reproducibility and computational accessibility, example analyses in this
+repository are performed on uniformly subsampled FASTQ files. This does not
+replace full-depth analyses of the original sequencing data.
+
+
 ---
 
 ## 🧱 Repository structure
