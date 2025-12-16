@@ -1,9 +1,10 @@
 name: qiime2-2023.9
 channels:
+  - https://packages.qiime2.org/qiime2/2023.9/conda/
   - conda-forge
   - bioconda
 dependencies:
-  - qiime2=2023.9
+  - qiime2
   - cutadapt
   - flash
   - biom-format
