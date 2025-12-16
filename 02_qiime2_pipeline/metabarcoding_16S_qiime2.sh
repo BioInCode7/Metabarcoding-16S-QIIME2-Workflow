@@ -516,3 +516,57 @@ qiime feature-table rarefy \
 # END OF RAREFACTION STEP
 ###############################################################################
 
+
+###############################################################################
+# STEP Y — Phylogenetic tree construction
+###############################################################################
+#
+# A phylogenetic tree is required for phylogeny-based diversity metrics
+# such as Faith's PD and UniFrac distances.
+#
+# IMPORTANT:
+# The tree is built from representative ASV sequences inferred by DADA2.
+#
+# This tree:
+#   - Represents relationships between ASVs
+#   - Does NOT represent an organismal phylogeny
+#
+###############################################################################
+#
+# TREE CONSTRUCTION PIPELINE
+#
+# 1. Multiple sequence alignment (MAFFT)
+# 2. Masking of hypervariable positions
+# 3. Tree inference (FastTree)
+# 4. Rooting
+#
+###############################################################################
+
+qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
+  --o-alignment "${QIIME2_OUTPUT_DIR}/aligned-rep-seqs.qza" \
+  --o-masked-alignment "${QIIME2_OUTPUT_DIR}/masked-aligned-rep-seqs.qza" \
+  --o-tree "${QIIME2_OUTPUT_DIR}/unrooted-tree.qza" \
+  --o-rooted-tree "${QIIME2_OUTPUT_DIR}/rooted-tree.qza"
+
+###############################################################################
+# STEP Z — Alpha and Beta diversity analyses
+###############################################################################
+#
+# Diversity analyses are performed on the rarefied feature table ONLY.
+#
+# This ensures:
+#   - Equal sampling depth across samples
+#   - Comparable diversity estimates
+#
+###############################################################################
+#
+# DIVERSITY METRICS USED
+#
+# Alpha diversity:
+#   - Shannon: accounts for richness and evenness
+#   - Observed Features: raw ASV richness
+#   - Faith's PD: phylogenetic diversity
+#
+# Beta d
+
