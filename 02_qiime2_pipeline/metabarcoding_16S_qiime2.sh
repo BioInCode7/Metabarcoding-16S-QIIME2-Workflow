@@ -1,207 +1,117 @@
 #!/bin/bash
-################################################################################
-# METABARCODING 16S rRNA PIPELINE (QIIME2)
-#
-# PURPOSE
-# -------
-# This script implements a complete, reproducible, and documented workflow
-# for 16S rRNA metabarcoding analysis using QIIME2 and downstream tools.
-#
-# The script is intentionally verbose and commented. It is meant to be read
-# as a methodological document, not just executed.
-#
-# The example system (insect gut microbiota under plastic-based diet) is used
-# ONLY as a case study. The pipeline is transferable to other systems.
-#
-# WHAT THIS PIPELINE DOES
-# ----------------------
-# - Processes raw paired-end FASTQ files
-# - Performs quality control and denoising (DADA2)
-# - Generates ASVs (Amplicon Sequence Variants)
-# - Assigns taxonomy using a trained classifier
-# - Computes alpha and beta diversity
-# - Performs multivariate statistical testing (PERMANOVA)
-# - Exports data for downstream analysis in R (e.g. PICRUSt, plots)
-#
-# WHAT THIS PIPELINE DOES NOT DO
-# -----------------------------
-# - It does NOT demonstrate biodegradation
-# - It does NOT measure functional activity
-# - It does NOT infer causality
-#
-# Functional profiles derived from 16S (e.g. PICRUSt) are INFERENCES ONLY.
-#
-# REPRODUCIBILITY
-# ---------------
-# The workflow is reproducible at the pipeline level.
-# Results depend on sequencing depth, primers, classifiers, and design.
-################################################################################
-################################################################################
-# 1. USER CONFIGURATION
-#
-# IMPORTANT:
-# ----------
-# Modify ONLY this section.
-# The rest of the script assumes these variables are correct.
-################################################################################
 
-# Base directory of the project
-PROJECT_DIR="/path/to/your/project"
+###############################################################################
+# Metabarcoding 16S Workflow — QIIME2
+###############################################################################
+#
+# AUTHOR:
+#   Jesús Salinas (University of Almería)
+#
+# REPOSITORY:
+#   https://github.com/BioInCode7/Metabarcoding-16S-QIIME2-Workflow
+#
+# DESCRIPTION:
+#   This script implements a complete 16S rRNA metabarcoding pipeline using
+#   QIIME2, starting from paired-end FASTQ files and ending with:
+#     - ASV inference (DADA2)
+#     - Taxonomic assignment
+#     - Alpha and beta diversity analyses
+#     - Differential abundance testing
+#     - Export of results for downstream analysis in R
+#
+#   The workflow is designed to be:
+#     - Reproducible
+#     - Transparent
+#     - Conservative in interpretation
+#
+#   This script is intentionally verbose and heavily commented.
+#   It is meant to be READ as much as it is meant to be RUN.
+#
+###############################################################################
+#
+# ⚠️ IMPORTANT CONCEPTUAL NOTES
+#
+# 1. This pipeline analyzes 16S rRNA amplicon data.
+#    It provides information about:
+#       - Community composition
+#       - Relative abundance
+#       - Diversity patterns
+#
+#    It DOES NOT measure:
+#       - Metabolic activity
+#       - Gene expression
+#       - Enzymatic function
+#
+# 2. Functional inference tools (e.g. PICRUSt2) predict POTENTIAL functions
+#    based on reference genomes.
+#
+#    → Predicted function ≠ measured function
+#
+# 3. All statistical outputs must be interpreted in light of:
+#       - Experimental design
+#       - Number of biological replicates
+#       - Sequencing depth
+#
+###############################################################################
+#
+# ⚙️ WORKFLOW OVERVIEW
+#
+#   0. Environment setup and input preparation
+#   1. Adapter and primer trimming (cutadapt)
+#   2. Paired-end merging (FLASH)
+#   3. Quality control and denoising (DADA2)
+#   4. Feature table filtering
+#   5. Taxonomic classification (Naive Bayes)
+#   6. Phylogenetic tree construction
+#   7. Alpha diversity analysis
+#   8. Beta diversity analysis and PERMANOVA
+#   9. Differential abundance analysis
+#  10. Data export for R and PICRUSt2
+#
+###############################################################################
+#
+# 📌 HOW TO USE THIS SCRIPT
+#
+# - This script is designed so that ONLY input paths need to be modified.
+# - All parameters are explicitly declared and justified.
+# - Users are strongly encouraged to:
+#     - Inspect intermediate outputs (.qzv)
+#     - Adjust parameters based on data quality
+#
+# ❗ This script should NOT be treated as a black box.
+#
+###############################################################################
+#
+# 📁 EXPECTED INPUTS
+#
+# - Paired-end FASTQ files (Phred33)
+# - Sample metadata file (QIIME2-compatible TSV)
+# - Pre-trained or custom-trained taxonomic classifier
+#
+###############################################################################
+#
+# 📦 SOFTWARE REQUIREMENTS
+#
+# - QIIME2 (tested with versions ≥ 2022)
+# - FLASH
+# - biom-format
+# - Conda environment properly configured
+#
+###############################################################################
+#
+# 🧠 PHILOSOPHY OF THIS PIPELINE
+#
+# This workflow prioritizes:
+#   - Interpretability over automation
+#   - Explicit decisions over defaults
+#   - Methodological clarity over speed
+#
+# It is intentionally conservative.
+#
+###############################################################################
 
-# Directory containing raw FASTQ files
-INPUT_FASTQ_DIR="/path/to/fastq"
+set -euo pipefail
 
-# Sample metadata file (QIIME2-compliant TSV)
-METADATA_FILE="/path/to/sample-metadata.tsv"
-
-# Taxonomic classifier (.qza)
-# CRITICAL NOTE:
-# --------------
-# The classifier MUST:
-# - match your primer set
-# - match your amplicon region
-# - match your final ASV length
-#
-# Using a generic classifier is strongly discouraged.
-CLASSIFIER_QZA="/path/to/classifier.qza"
-
-# Primer sequences (leave empty if not trimming primers)
-FORWARD_PRIMER=""
-REVERSE_PRIMER=""
-
-# Number of CPU threads
-THREADS=16
-################################################################################
-# 2. DIRECTORY STRUCTURE
-#
-# A clear directory structure improves:
-# - reproducibility
-# - debugging
-# - long-term project maintenance
-################################################################################
-
-mkdir -p "${PROJECT_DIR}"/{manifests,qiime_imported,qiime_cutadapt,qiime_dada2}
-mkdir -p "${PROJECT_DIR}"/{qiime_downstream,qiime_visualizations}
-mkdir -p "${PROJECT_DIR}"/{exported_data,summary_stats}
-################################################################################
-# 3. INPUT DATA AND MANIFEST
-#
-# QIIME2 does not read FASTQ files directly.
-# Instead, it requires a MANIFEST file linking sample IDs to file paths.
-#
-# This design:
-# - enforces explicit sample tracking
-# - prevents silent mismatches
-################################################################################
-
-# The user must provide a manifest.tsv
-# Example manifest is provided in the repository.
-MANIFEST_FILE="${PROJECT_DIR}/manifests/manifest.tsv"
-################################################################################
-# 4. IMPORT RAW READS INTO QIIME2
-#
-# This step converts raw FASTQ files into a QIIME2 artifact (.qza).
-# No processing occurs here.
-################################################################################
-
-qiime tools import \
-  --type 'SampleData[PairedEndSequencesWithQuality]' \
-  --input-path "$MANIFEST_FILE" \
-  --input-format PairedEndFastqManifestPhred33V2 \
-  --output-path "${PROJECT_DIR}/qiime_imported/demux_raw.qza"
-################################################################################
-# 5. ADAPTER AND PRIMER TRIMMING (CUTADAPT)
-#
-# WHY?
-# ----
-# Primer and adapter sequences:
-# - are not biological information
-# - bias error models
-# - interfere with taxonomy assignment
-#
-# Removing them improves:
-# - DADA2 denoising
-# - taxonomic resolution
-################################################################################
-
-qiime cutadapt trim-paired \
-  --i-demultiplexed-sequences "${PROJECT_DIR}/qiime_imported/demux_raw.qza" \
-  --p-front-f "$FORWARD_PRIMER" \
-  --p-front-r "$REVERSE_PRIMER" \
-  --p-cores "$THREADS" \
-  --o-trimmed-sequences "${PROJECT_DIR}/qiime_cutadapt/demux_trimmed.qza"
-################################################################################
-# 6. DENOISING WITH DADA2
-#
-# DADA2 performs:
-# - error modeling
-# - dereplication
-# - chimera removal
-#
-# Output:
-# - ASVs (exact sequence variants, not OTUs)
-#
-# PARAMETER CHOICE IS CRITICAL.
-################################################################################
-
-# Example parameters (MUST be optimized per dataset)
-TRUNC_LEN=400
-TRIM_LEFT=0
-
-qiime dada2 denoise-single \
-  --i-demultiplexed-seqs "${PROJECT_DIR}/qiime_cutadapt/demux_trimmed.qza" \
-  --p-trunc-len "$TRUNC_LEN" \
-  --p-trim-left "$TRIM_LEFT" \
-  --p-n-threads "$THREADS" \
-  --o-table "${PROJECT_DIR}/qiime_dada2/table.qza" \
-  --o-representative-sequences "${PROJECT_DIR}/qiime_dada2/rep_seqs.qza" \
-  --o-denoising-stats "${PROJECT_DIR}/qiime_dada2/stats.qza"
-################################################################################
-# 7. TAXONOMIC CLASSIFICATION
-#
-# Taxonomy is assigned using a Naive Bayes classifier.
-#
-# IMPORTANT:
-# ----------
-# Classifier quality has a stronger effect on results
-# than almost any other downstream step.
-################################################################################
-
-qiime feature-classifier classify-sklearn \
-  --i-classifier "$CLASSIFIER_QZA" \
-  --i-reads "${PROJECT_DIR}/qiime_dada2/rep_seqs.qza" \
-  --p-n-jobs "$THREADS" \
-  --o-classification "${PROJECT_DIR}/qiime_downstream/taxonomy.qza"
-################################################################################
-# 8. FILTERING AND DIVERSITY ANALYSES
-#
-# Includes:
-# - contaminant removal
-# - rarefaction
-# - alpha diversity
-# - beta diversity
-#
-# Rarefaction is used ONLY for diversity metrics.
-################################################################################
-################################################################################
-# 9. EXPORT FOR DOWNSTREAM ANALYSIS
-#
-# Exports:
-# - feature table
-# - taxonomy
-# - representative sequences
-#
-# These files can be used in:
-# - R (ggplot, phyloseq)
-# - PICRUSt
-################################################################################
-################################################################################
-# FINAL NOTES
-#
-# - 16S provides relative abundances, not absolute counts.
-# - Functional inference ≠ functional measurement.
-# - Results must be interpreted in ecological context.
-#
-# This pipeline is a tool.
-# Biological interpretation is the responsibility of the researcher.
-################################################################################
+###############################################################################
+# START OF PIPELINE
+###############################################################################
