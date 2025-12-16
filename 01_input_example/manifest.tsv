@@ -1,3 +1,3 @@
-sample-id,absolute-filepath,direction
-S1,/home/jesus/Bioinformatica/Bioinfo_BIO175/GitHUbRepoMetabarcoding/01_input_example/fastq_subsampled/S1_R1_subsampled.fastq.gz,forward
-S1,/home/jesus/Bioinformatica/Bioinfo_BIO175/GitHUbRepoMetabarcoding/01_input_example/fastq_subsampled/S1_R2_subsampled.fastq.gz,reverse
+sample-id	absolute-filepath	direction
+S1	/home/jesus/Bioinformatica/Bioinfo_BIO175/GitHUbRepoMetabarcoding/01_input_example/fastq_subsampled/S1_R1_subsampled.fastq.gz	forward
+S1	/home/jesus/Bioinformatica/Bioinfo_BIO175/GitHUbRepoMetabarcoding/01_input_example/fastq_subsampled/S1_R2_subsampled.fastq.gz	reverse

@@ -193,6 +193,43 @@ mkdir -p "${EXPORT_DIR}"
 # END OF CONFIGURATION BLOCK
 ###############################################################################
 
+###############################################################################
+# STEP 0 — Auto-generate paired-end FASTQ manifest (example data)
+###############################################################################
+#
+# This pipeline automatically generates a QIIME2-compatible manifest file
+# from the subsampled FASTQ files included in the repository.
+#
+# Expected filename pattern:
+#   <sample-id>_R1_*.fastq.gz
+#   <sample-id>_R2_*.fastq.gz
+#
+###############################################################################
+
+INPUT_FASTQ_DIR="${PROJECT_BASE_DIR}/raw_fastq"
+MANIFEST_FILE="${PROJECT_BASE_DIR}/manifest.tsv"
+
+mkdir -p "$(dirname "$MANIFEST_FILE")"
+
+echo -e "sample-id\tforward-absolute-filepath\treverse-absolute-filepath" \
+  > "$MANIFEST_FILE"
+
+for R1 in "${INPUT_FASTQ_DIR}"/*_R1_*.fastq.gz; do
+  SAMPLE_ID=$(basename "$R1" | sed 's/_R1_.*\.fastq\.gz//')
+
+  R2="${INPUT_FASTQ_DIR}/${SAMPLE_ID}_R2_subsampled.fastq.gz"
+
+  if [[ ! -f "$R2" ]]; then
+    echo "ERROR: Missing R2 file for sample ${SAMPLE_ID}"
+    exit 1
+  fi
+
+  echo -e "${SAMPLE_ID}\t${R1}\t${R2}" \
+    >> "$MANIFEST_FILE"
+done
+
+echo "--- Paired-end FASTQ manifest generated ---"
+echo "    $MANIFEST_FILE"
 
 ###############################################################################
 # STEP 1 — Import raw sequencing data into QIIME2
