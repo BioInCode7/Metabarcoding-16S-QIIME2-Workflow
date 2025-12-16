@@ -741,3 +741,129 @@ qiime diversity beta-group-significance \
 #
 ###############################################################################
 
+
+###############################################################################
+# STEP U — Functional inference with PICRUSt2
+###############################################################################
+#
+# PICRUSt2 predicts the FUNCTIONAL POTENTIAL of microbial communities
+# based on 16S rRNA gene sequences and reference genomes.
+#
+###############################################################################
+#
+# ⚠️ CRITICAL CONCEPTUAL WARNING
+#
+# PICRUSt2:
+#   - Does NOT measure gene presence directly
+#   - Does NOT measure gene expression
+#   - Does NOT measure enzymatic activity
+#
+# It infers potential functions based on phylogenetic proximity
+# to reference genomes.
+#
+# Therefore:
+#   Predicted function ≠ realized function
+#
+###############################################################################
+#
+# WHAT PICRUSt2 CAN BE USED FOR
+#
+# - Hypothesis generation
+# - Functional comparison between groups
+# - Identification of overrepresented pathways
+#
+###############################################################################
+#
+# WHAT PICRUSt2 CANNOT PROVE
+#
+# - Active metabolism
+# - Biodegradation rates
+# - Enzymatic efficiency
+# - Causality between taxa and phenotype
+#
+###############################################################################
+#
+# RECOMMENDED INTERPRETATION
+#
+# PICRUSt2 results should be interpreted as:
+#   - Functional potential
+#   - Community-level tendencies
+#   - Supporting evidence, never as standalone proof
+#
+###############################################################################
+#
+# IMPORTANT METHODOLOGICAL NOTE
+#
+# PICRUSt2 MUST be run on:
+#   - Non-rarefied feature table
+#   - ASV representative sequences
+#
+# Rarefaction removes quantitative information required
+# for functional inference.
+#
+###############################################################################
+
+
+###############################################################################
+# EXPORT DATA FOR PICRUSt2
+###############################################################################
+#
+# PICRUSt2 is run outside QIIME2.
+# Therefore, data must be exported to standard formats.
+#
+###############################################################################
+
+# Export feature table (BIOM format)
+qiime tools export \
+  --input-path "${QIIME2_OUTPUT_DIR}/table-taxa-filtered.qza" \
+  --output-path "${EXPORT_DIR}/picrust2"
+
+# Export representative sequences (FASTA)
+qiime tools export \
+  --input-path "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
+  --output-path "${EXPORT_DIR}/picrust2"
+
+###############################################################################
+# Convert BIOM to TSV (optional but recommended for inspection)
+###############################################################################
+
+biom convert \
+  -i "${EXPORT_DIR}/picrust2/feature-table.biom" \
+  -o "${EXPORT_DIR}/picrust2/feature-table.tsv" \
+  --to-tsv
+
+###############################################################################
+# END OF EXPORTS FOR PICRUSt2
+###############################################################################
+
+
+###############################################################################
+# NOTE ON RUNNING PICRUSt2
+###############################################################################
+#
+# PICRUSt2 should be executed in a dedicated environment.
+#
+# Example command (to be run outside this script):
+#
+# picrust2_pipeline.py \
+#   -s rep-seqs-dada2.fasta \
+#   -i feature-table.biom \
+#   -o picrust2_out \
+#   -p 8
+#
+# Downstream analyses (e.g. pathway comparison, visualization)
+# are performed in R.
+#
+###############################################################################
+#
+# FINAL INTERPRETATION GUIDELINE (PAPER-READY)
+#
+# "Functional profiles were inferred using PICRUSt2 and interpreted as
+# community-level functional potential. These predictions do not constitute
+# direct evidence of gene presence, expression, or metabolic activity."
+#
+###############################################################################
+#
+# END OF PICRUSt2 SECTION
+###############################################################################
+
