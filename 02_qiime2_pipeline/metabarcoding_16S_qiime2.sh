@@ -403,3 +403,116 @@ qiime metadata tabulate \
 #   - Not by aggressive database pruning
 #
 ###############################################################################
+
+###############################################################################
+# STEP X — Rarefaction and Sampling Depth Selection
+###############################################################################
+#
+# Rarefaction is applied exclusively for diversity analyses (alpha and beta).
+# It is NOT used for:
+#   - Taxonomic composition
+#   - Differential abundance analysis
+#   - Functional inference (PICRUSt2)
+#
+# Rarefaction enforces an equal sequencing depth across samples to allow
+# meaningful diversity comparisons.
+#
+# ⚠️ IMPORTANT:
+# Rarefaction ALWAYS discards data.
+# The goal is NOT to avoid data loss, but to make it explicit and justified.
+#
+###############################################################################
+#
+# CONCEPTUAL FRAMEWORK
+#
+# Sampling depth is the number of sequences per sample retained after
+# subsampling. It represents a trade-off between:
+#
+#   - Retaining all biological replicates
+#   - Preserving as much within-sample diversity as possible
+#
+# There is no universally "correct" sampling depth.
+# The chosen value must be justified based on the dataset.
+#
+###############################################################################
+#
+# HOW TO SELECT SAMPLING DEPTH (REQUIRED PROCEDURE)
+#
+# 1. Inspect the feature table AFTER:
+#    - DADA2 denoising
+#    - Taxonomic filtering (mitochondria, chloroplasts, eukaryotes removed)
+#
+#    Command:
+#
+#    qiime feature-table summarize \
+#      --i-table table-taxa-filtered.qza \
+#      --o-visualization table-summary-taxa-filtered.qzv \
+#      --m-sample-metadata-file sample-metadata.tsv
+#
+# 2. Open the visualization:
+#      qiime view table-summary-taxa-filtered.qzv
+#
+# 3. Identify:
+#    - The minimum sequencing depth
+#    - Samples or groups with systematically lower depth
+#
+###############################################################################
+#
+# RAREFACTION CURVES AS DECISION SUPPORT
+#
+# Rarefaction curves MUST be interpreted metric by metric:
+#
+#   - Shannon diversity:
+#       * Typically reaches saturation at relatively low depths
+#       * Robust to subsampling
+#       * Recommended for interpretation when sequencing depth is limited
+#
+#   - Observed Features:
+#       * Sensitive to sequencing depth
+#       * May or may not reach saturation
+#
+#   - Chao1:
+#       * Estimates unseen richness
+#       * Often does NOT plateau
+#       * Lack of saturation does NOT invalidate the analysis
+#
+# Failure of Chao1 to plateau indicates incomplete richness capture,
+# NOT methodological error.
+#
+###############################################################################
+#
+# FINAL DECISION CRITERIA
+#
+# The selected sampling depth should:
+#   - Retain all biological replicates whenever possible
+#   - Fall below the minimum sample depth
+#   - Be supported by Shannon rarefaction curves approaching saturation
+#
+# Richness-based metrics should be interpreted conservatively when curves
+# do not plateau.
+#
+###############################################################################
+#
+# EXAMPLE STATEMENT (PAPER-READY)
+#
+# "The sampling depth was selected as a compromise between retaining all samples
+# and preserving sequencing depth. Rarefaction curves indicated that Shannon
+# diversity approached saturation at this depth, while richness estimators did
+# not fully plateau, suggesting underestimation of absolute richness but
+# allowing robust comparative diversity analyses."
+#
+###############################################################################
+#
+# RAREFY FEATURE TABLE
+#
+###############################################################################
+
+qiime feature-table rarefy \
+  --i-table table-taxa-filtered.qza \
+  --p-sampling-depth 3000 \
+  --o-rarefied-table table-rarefied.qza
+
+###############################################################################
+# END OF RAREFACTION STEP
+###############################################################################
+
