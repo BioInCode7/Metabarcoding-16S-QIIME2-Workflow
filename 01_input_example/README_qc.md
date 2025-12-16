@@ -67,8 +67,12 @@ aggregated with **MultiQC**.
 
 MultiQC report:
 
-01_input_example/qc_multiqc/multiqc_report.html
+Representative QC reports (FastQC and MultiQC) are provided as examples in:
 
+01_input_example/qc_example/
+
+Full QC outputs can be regenerated at any time by running FastQC and MultiQC
+on the subsampled FASTQ files.
 
 These results indicate high-quality Illumina sequencing data suitable for
 conservative trimming and denoising.
@@ -222,6 +226,25 @@ All quality control steps and parameter choices in this directory are:
 
 This ensures transparency and methodological consistency throughout the
 entire QIIME2 metabarcoding workflow.
+
+bash subsample_fastq.sh /path/to/raw_fastq
+
+### Example QC reports included in the repository
+
+To keep the repository lightweight while maintaining full transparency,
+only **representative QC reports** are included:
+
+- `qc_example/fastqc_example_R1.html`
+- `qc_example/fastqc_example_R2.html`
+- `qc_example/multiqc_report.html`
+
+These files illustrate typical quality profiles observed across all samples.
+
+Complete FastQC and MultiQC outputs (including all samples and intermediate
+data files) are intentionally excluded, as they are fully regenerable and do
+not affect downstream results.
+
+
 
 
 
