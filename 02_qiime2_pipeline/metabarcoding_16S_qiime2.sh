@@ -314,3 +314,92 @@ qiime dada2 denoise-paired \
 # STEP 6 — DADA2 summary statistics
 ###############################################################################
 
+
+###############################################################################
+# STEP 7 — Taxonomic classification of ASVs
+###############################################################################
+#
+# Taxonomic assignment is performed using a Naive Bayes classifier.
+#
+# ⚠️ CRITICAL CONCEPT:
+# The classifier MUST be consistent with:
+#   - The amplified region (e.g. V3–V4)
+#   - The final ASV length after trimming/truncation
+#
+# Using a generic full-length classifier is a common source of:
+#   - Low confidence assignments
+#   - Poor genus-level resolution
+#   - Misleading biological interpretations
+#
+###############################################################################
+#
+# CLASSIFIER STRATEGY USED IN THIS WORKFLOW
+#
+# - Custom-trained classifier
+# - Region-specific (V3–V4)
+# - Length-matched to ASVs
+# - Curated using RESCRIPt to ensure:
+#     - Reduced redundancy
+#     - Lower memory usage
+#     - Pipeline stability
+#
+# IMPORTANT:
+# RESCRIPt does NOT artificially increase taxonomic resolution.
+# Its primary value is methodological robustness and reproducibility.
+#
+###############################################################################
+
+qiime feature-classifier classify-sklearn \
+  --i-classifier "${SILVA_CLASSIFIER_QZA}" \
+  --i-reads "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
+  --p-n-jobs "${N_THREADS}" \
+  --o-classification "${QIIME2_OUTPUT_DIR}/taxonomy.qza"
+
+###############################################################################
+# STEP 8 — Taxonomy visualization
+###############################################################################
+#
+# This table reports confidence scores and taxonomic depth.
+# Users are strongly encouraged to inspect:
+#   - Mean confidence
+#   - Fraction of ASVs classified to genus level
+#
+###############################################################################
+
+qiime metadata tabulate \
+  --m-input-file "${QIIME2_OUTPUT_DIR}/taxonomy.qza" \
+  --o-visualization "${VISUALIZATION_DIR}/taxonomy.qzv"
+
+###############################################################################
+# END OF TAXONOMIC CLASSIFICATION
+###############################################################################
+
+###############################################################################
+# NOTE ON CLASSIFIER TRAINING AND RESCRIPt
+###############################################################################
+#
+# Classifier training is intentionally NOT included in this script.
+#
+# Training a classifier is:
+#   - Computationally expensive
+#   - Dependent on reference database choice
+#   - Dependent on available hardware
+#
+# In this workflow, classifier training and validation are:
+#   - Documented separately
+#   - Versioned
+#   - Justified
+#
+# See:
+#   02_qiime2_pipeline/classifiers/README_classifiers.md
+#
+# RESCRIPt was used to:
+#   - Remove low-quality reference sequences
+#   - Dereplicate redundant entries
+#   - Enable classifier training on limited hardware
+#
+# Importantly:
+#   - Taxonomic assignment gains were driven by length consistency
+#   - Not by aggressive database pruning
+#
+###############################################################################
