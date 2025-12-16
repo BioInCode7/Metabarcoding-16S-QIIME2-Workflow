@@ -267,3 +267,50 @@ qiime demux summarize \
 ###############################################################################
 # END OF STEP 1
 ###############################################################################
+
+###############################################################################
+# STEP 5 — Denoising and ASV inference with DADA2
+###############################################################################
+#
+# DADA2 performs:
+# - Quality filtering
+# - Error model learning
+# - Dereplication
+# - Chimera removal
+#
+# The result is a table of Amplicon Sequence Variants (ASVs),
+# which represent exact biological sequences inferred from the data.
+#
+# IMPORTANT CONCEPT:
+# ASVs are NOT OTUs.
+# They are inferred sequences with single-nucleotide resolution.
+#
+###############################################################################
+#
+# PARAMETER SELECTION
+#
+# The truncation lengths below MUST be chosen after inspecting:
+#   - demux-summary.qzv
+#   - demux-trimmed-summary.qzv
+#
+# There is NO universally correct value.
+#
+###############################################################################
+
+# Example truncation values (to be adjusted by the user)
+TRUNC_LEN_F=240
+TRUNC_LEN_R=200
+
+qiime dada2 denoise-paired \
+  --i-demultiplexed-seqs "${QIIME2_OUTPUT_DIR}/demux-trimmed.qza" \
+  --p-trunc-len-f "${TRUNC_LEN_F}" \
+  --p-trunc-len-r "${TRUNC_LEN_R}" \
+  --p-n-threads "${N_THREADS}" \
+  --o-table "${QIIME2_OUTPUT_DIR}/table-dada2.qza" \
+  --o-representative-sequences "${QIIME2_OUTPUT_DIR}/rep-seqs-dada2.qza" \
+  --o-denoising-stats "${QIIME2_OUTPUT_DIR}/denoising-stats.qza"
+
+###############################################################################
+# STEP 6 — DADA2 summary statistics
+###############################################################################
+
