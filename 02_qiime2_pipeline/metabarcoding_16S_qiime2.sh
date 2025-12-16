@@ -115,3 +115,81 @@ set -euo pipefail
 ###############################################################################
 # START OF PIPELINE
 ###############################################################################
+
+###############################################################################
+# CONFIGURATION: PROJECT STRUCTURE AND INPUT FILES
+###############################################################################
+#
+# This section defines all project-specific paths.
+# Users should ONLY modify this block to adapt the pipeline to their system.
+#
+# Best practice:
+# - Keep raw data, intermediate files and results clearly separated
+# - Avoid relative paths inside the pipeline logic
+#
+###############################################################################
+
+# ===============================
+# PROJECT ROOT DIRECTORY
+# ===============================
+# This is the base directory where all inputs and outputs will be stored.
+# Change this path to your own project location.
+
+PROJECT_BASE_DIR="/path/to/your/project"
+
+# ===============================
+# INPUT DATA
+# ===============================
+
+# Directory containing paired-end FASTQ files (Phred33)
+INPUT_FASTQ_DIR="${PROJECT_BASE_DIR}/raw_fastq"
+
+# Sample metadata file (QIIME2-compatible TSV)
+SAMPLE_METADATA_FILE="${PROJECT_BASE_DIR}/sample-metadata.tsv"
+
+# Manifest file for importing FASTQ files into QIIME2
+MANIFEST_FILE="${PROJECT_BASE_DIR}/manifest.tsv"
+
+# ===============================
+# TAXONOMIC CLASSIFIER
+# ===============================
+#
+# IMPORTANT:
+# The classifier MUST match:
+#   - Amplicon region (e.g. V3–V4)
+#   - Read length after trimming/truncation
+#
+# Using a generic classifier is a common source of poor taxonomic resolution.
+
+SILVA_CLASSIFIER_QZA="/path/to/silva-V3V4-custom-classifier.qza"
+
+# ===============================
+# COMPUTATIONAL RESOURCES
+# ===============================
+#
+# Adjust according to your system.
+# High values improve speed but increase memory usage.
+
+N_THREADS=16
+
+###############################################################################
+# OUTPUT DIRECTORIES
+###############################################################################
+#
+# All outputs are organized into subdirectories for clarity.
+# These directories will be created automatically if they do not exist.
+#
+###############################################################################
+
+QIIME2_OUTPUT_DIR="${PROJECT_BASE_DIR}/qiime2_outputs"
+VISUALIZATION_DIR="${PROJECT_BASE_DIR}/qiime2_visualizations"
+EXPORT_DIR="${PROJECT_BASE_DIR}/exported_data"
+
+mkdir -p "${QIIME2_OUTPUT_DIR}"
+mkdir -p "${VISUALIZATION_DIR}"
+mkdir -p "${EXPORT_DIR}"
+
+###############################################################################
+# END OF CONFIGURATION BLOCK
+###############################################################################
+
