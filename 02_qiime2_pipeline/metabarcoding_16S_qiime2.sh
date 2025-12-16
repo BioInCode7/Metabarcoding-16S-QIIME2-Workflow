@@ -135,7 +135,7 @@ set -euo pipefail
 # This is the base directory where all inputs and outputs will be stored.
 # Change this path to your own project location.
 
-PROJECT_BASE_DIR="/path/to/your/project"
+PROJECT_BASE_DIR="${PROJECT_BASE_DIR:-$(pwd)}"
 
 # ===============================
 # INPUT DATA
